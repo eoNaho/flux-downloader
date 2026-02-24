@@ -1,0 +1,64 @@
+---
+name: 📥 Download Issue
+description: Report a problem downloading a specific video or site
+title: "[Download]: "
+labels: ["download-issue"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Having trouble downloading from a specific site or video? Let us know!
+
+  - type: input
+    id: url
+    attributes:
+      label: Video/Site URL
+      description: The URL you're trying to download from.
+      placeholder: "https://..."
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: App Version
+      description: Which version of Flux Downloader?
+      placeholder: "e.g. 0.1.1"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - Windows
+        - macOS
+        - Linux
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happens?
+      description: Describe the error or unexpected behavior.
+      placeholder: "The download fails with..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Message / Logs
+      description: Paste any error messages shown in the app.
+      render: shell
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have updated yt-dlp to the latest version (Settings → Update yt-dlp)
+        - label: The video is not private or region-locked
+        - label: I have tried using browser cookies (Settings → Cookies)
