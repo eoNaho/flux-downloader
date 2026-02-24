@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
@@ -12,6 +12,9 @@ import {
   CheckSquare,
   Square,
   X,
+  BarChart3,
+  FileVideo,
+  FileAudio,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useQueueStore } from "../store/queueStore";
@@ -57,12 +60,30 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
   const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
   const [activeTab, setActiveTab] = useState<"video" | "audio">("video");
   const [selectedFormat, setSelectedFormat] = useState<string>("");
-  const savedDefaultPath = localStorage.getItem("settings-default-path");
-  const [downloadPath, setDownloadPath] = useState<string>(
-    savedDefaultPath || "Downloads",
-  );
-  const [realPath, setRealPath] = useState<string>(savedDefaultPath || ".");
+  const [downloadPath, setDownloadPath] = useState<string>("Downloads");
+  const [realPath, setRealPath] = useState<string>("");
   const [subtitles, setSubtitles] = useState(false);
+
+  // Resolve the real Downloads directory on first launch
+  useEffect(() => {
+    const savedPath = localStorage.getItem("settings-default-path");
+    if (savedPath) {
+      setDownloadPath(savedPath);
+      setRealPath(savedPath);
+    } else {
+      invoke<string>("get_download_dir")
+        .then((dir) => {
+          setDownloadPath(dir);
+          setRealPath(dir);
+          localStorage.setItem("settings-default-path", dir);
+        })
+        .catch((e) => {
+          console.error("Failed to get download dir:", e);
+          // Fallback to home directory style path
+          setRealPath(".");
+        });
+    }
+  }, []);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
   const [cookiesBrowser] = useState("none");
@@ -292,6 +313,9 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
             </button>
           </div>
         </div>
+
+        {/* Statistics Cards — shown when no video is being analyzed */}
+        {!metadata && !showPlaylistModal && !isAnalyzing && <StatsCards />}
 
         {showPlaylistModal && metadata?.playlist_entries && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -612,6 +636,102 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function StatsCards() {
+  const { t } = useTranslation();
+
+  const stats = useMemo(() => {
+    try {
+      const raw = localStorage.getItem("download-history");
+      const history: {
+        isAudio?: boolean;
+        resolution?: string;
+        formatId?: string;
+      }[] = raw ? JSON.parse(raw) : [];
+
+      const totalDownloads = history.length;
+      const videoCount = history.filter((h) => !h.isAudio).length;
+      const audioCount = history.filter((h) => h.isAudio).length;
+
+      // Count most common resolution
+      const resolutions: Record<string, number> = {};
+      history.forEach((h) => {
+        const key = h.isAudio ? "MP3" : h.resolution || "Unknown";
+        resolutions[key] = (resolutions[key] || 0) + 1;
+      });
+      const topFormat = Object.entries(resolutions).sort(
+        (a, b) => b[1] - a[1],
+      )[0];
+
+      return { totalDownloads, videoCount, audioCount, topFormat };
+    } catch {
+      return {
+        totalDownloads: 0,
+        videoCount: 0,
+        audioCount: 0,
+        topFormat: undefined,
+      };
+    }
+  }, []);
+
+  if (stats.totalDownloads === 0) return null;
+
+  const cards = [
+    {
+      icon: <Download className="w-5 h-5" />,
+      label: t("stats.total_downloads"),
+      value: stats.totalDownloads.toString(),
+      color: "from-purple-500/20 to-purple-500/5",
+      iconColor: "text-purple-400",
+      borderColor: "border-purple-500/20",
+    },
+    {
+      icon: <FileVideo className="w-5 h-5" />,
+      label: t("stats.videos"),
+      value: stats.videoCount.toString(),
+      color: "from-blue-500/20 to-blue-500/5",
+      iconColor: "text-blue-400",
+      borderColor: "border-blue-500/20",
+    },
+    {
+      icon: <FileAudio className="w-5 h-5" />,
+      label: t("stats.audios"),
+      value: stats.audioCount.toString(),
+      color: "from-emerald-500/20 to-emerald-500/5",
+      iconColor: "text-emerald-400",
+      borderColor: "border-emerald-500/20",
+    },
+    {
+      icon: <BarChart3 className="w-5 h-5" />,
+      label: t("stats.top_format"),
+      value: stats.topFormat ? stats.topFormat[0] : "—",
+      color: "from-amber-500/20 to-amber-500/5",
+      iconColor: "text-amber-400",
+      borderColor: "border-amber-500/20",
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      {cards.map((card, i) => (
+        <div
+          key={i}
+          className={clsx(
+            "bg-gradient-to-b rounded-xl border p-5 transition-all hover:scale-[1.02]",
+            card.color,
+            card.borderColor,
+          )}
+        >
+          <div className={clsx("mb-3", card.iconColor)}>{card.icon}</div>
+          <div className="text-2xl font-bold text-white mb-1">{card.value}</div>
+          <div className="text-xs text-zinc-400 font-medium uppercase tracking-wider">
+            {card.label}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

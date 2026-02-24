@@ -404,6 +404,12 @@ async fn update_ytdlp(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn get_download_dir(app: tauri::AppHandle) -> Result<String, String> {
+    let download_dir = app.path().download_dir().map_err(|e| e.to_string())?;
+    Ok(download_dir.to_string_lossy().to_string())
+}
+
+#[tauri::command]
 fn open_folder(path: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
@@ -459,7 +465,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet, download_video, get_video_metadata, fetch_image_base64, open_folder, get_ytdlp_version, update_ytdlp])
+        .invoke_handler(tauri::generate_handler![greet, download_video, get_video_metadata, fetch_image_base64, open_folder, get_download_dir, get_ytdlp_version, update_ytdlp])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

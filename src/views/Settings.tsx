@@ -24,6 +24,13 @@ export function Settings() {
     const savedPath = localStorage.getItem("settings-default-path");
     if (savedPath) {
       setDefaultPath(savedPath);
+    } else {
+      invoke<string>("get_download_dir")
+        .then((dir) => {
+          setDefaultPath(dir);
+          localStorage.setItem("settings-default-path", dir);
+        })
+        .catch(() => setDefaultPath("Not set"));
     }
     invoke<string>("get_ytdlp_version")
       .then((v) => setYtdlpVersion(v))

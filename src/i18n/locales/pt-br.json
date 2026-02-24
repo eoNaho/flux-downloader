@@ -94,5 +94,11 @@
     "unselect_all": "Deselecionar Todos",
     "cancel": "Cancelar",
     "add_selected": "Adicionar Selecionados à Fila"
+  },
+  "stats": {
+    "total_downloads": "Total de Downloads",
+    "videos": "Vídeos",
+    "audios": "Áudios",
+    "top_format": "Formato Mais Usado"
   }
 }

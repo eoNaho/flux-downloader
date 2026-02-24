@@ -94,5 +94,11 @@
     "unselect_all": "Unselect All",
     "cancel": "Cancel",
     "add_selected": "Add Selected to Queue"
+  },
+  "stats": {
+    "total_downloads": "Total Downloads",
+    "videos": "Videos",
+    "audios": "Audios",
+    "top_format": "Top Format"
   }
 }

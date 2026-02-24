@@ -1,5 +1,11 @@
 import React from "react";
-import { Download, Link, List, Settings, Clock } from "lucide-react";
+import {
+  Download,
+  Link,
+  List,
+  Settings,
+  Clock,
+} from "lucide-react";
 import { clsx } from "clsx";
 import { useTranslation } from "../i18n/config";
 
