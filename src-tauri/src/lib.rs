@@ -441,7 +441,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             // When a second instance is opened (e.g. via deep link), forward the URL
             for arg in argv.iter().skip(1) {
-                if arg.starts_with("fluxdonwloader://") {
+                if arg.starts_with("fluxdownloader://") {
                     let _ = app.emit("deep-link-url", arg.clone());
                 }
             }
@@ -455,7 +455,7 @@ pub fn run() {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
-                let _ = _app.deep_link().register("fluxdonwloader");
+                let _ = _app.deep_link().register("fluxdownloader");
             }
             Ok(())
         })

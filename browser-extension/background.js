@@ -5,7 +5,7 @@ chrome.action.onClicked.addListener(async (tab) => {
     return;
   }
 
-  const deepLink = `fluxdonwloader://download?url=${encodeURIComponent(tab.url)}`;
+  const deepLink = `fluxdownloader://download?url=${encodeURIComponent(tab.url)}`;
 
   chrome.scripting.executeScript({
     target: { tabId: tab.id },

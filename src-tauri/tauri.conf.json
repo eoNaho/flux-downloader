@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "fluxdonwloader",
+  "productName": "fluxdownloader",
   "version": "0.1.0",
-  "identifier": "com.naho.fluxdonwloader",
+  "identifier": "com.naho.fluxdownloader",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -44,7 +44,7 @@
     },
     "deep-link": {
       "desktop": {
-        "schemes": ["fluxdonwloader"]
+        "schemes": ["fluxdownloader"]
       }
     }
   }

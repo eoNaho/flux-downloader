@@ -129,7 +129,7 @@ jobs:
 
             * **Robust yt-dlp Updater**: The one-click update button in settings now flawlessly downloads the latest engine directly from GitHub, working elegantly across Windows, Mac, and Linux!
             * **Native OS Notifications**: Get sleek native alerts the moment your videos finish downloading.
-            * **Browser Extension Support**: Introducing deep link integration (`fluxdonwloader://`)! Add the Flux Extension to your browser to send URLs straight to the app.
+            * **Browser Extension Support**: Introducing deep link integration (`fluxdownloader://`)! Add the Flux Extension to your browser to send URLs straight to the app.
             * **Improved Engine**: Major stability fixes for YouTube downloads, progress tracking, and playlist rendering.
 
             Thank you for using Flux Downloader! 💜

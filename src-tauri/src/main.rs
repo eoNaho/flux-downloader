@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    fluxdonwloader_lib::run()
+    fluxdownloader_lib::run()
 }
