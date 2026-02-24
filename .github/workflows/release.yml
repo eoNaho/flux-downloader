@@ -231,4 +231,4 @@ jobs:
 
           git add -A
           git commit -m "Update to v${VERSION}" || echo "No changes to commit"
-          git push
+          git push --set-upstream origin master
