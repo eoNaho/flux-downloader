@@ -153,15 +153,17 @@ jobs:
           echo "${{ secrets.AUR_SSH_PRIVATE_KEY }}" > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
           ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
-          cat >> ~/.ssh/config << 'EOF'
-          Host aur.archlinux.org
-            IdentityFile ~/.ssh/aur
-            User aur
-          EOF
+          printf "Host aur.archlinux.org\n  IdentityFile ~/.ssh/aur\n  User aur\n" >> ~/.ssh/config
 
       - name: clone AUR repo
         run: |
-          git clone ssh://aur@aur.archlinux.org/flux-downloader-bin.git /tmp/aur-pkg
+          if ! git clone ssh://aur@aur.archlinux.org/flux-downloader-bin.git /tmp/aur-pkg 2>/dev/null; then
+            echo "AUR package doesn't exist yet, initializing..."
+            mkdir -p /tmp/aur-pkg
+            cd /tmp/aur-pkg
+            git init
+            git remote add origin ssh://aur@aur.archlinux.org/flux-downloader-bin.git
+          fi
           git -C /tmp/aur-pkg config user.name "GitHub Actions"
           git -C /tmp/aur-pkg config user.email "actions@github.com"
 
