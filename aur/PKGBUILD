@@ -1,0 +1,17 @@
+# Maintainer: Naho <naho@users.noreply.github.com>
+pkgname=flux-downloader-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="A modern, fast YouTube downloader built with Tauri"
+arch=('x86_64')
+url="https://github.com/eoNaho/flux-downloader"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'libsoup3' 'libappindicator-gtk3')
+provides=('flux-downloader')
+conflicts=('flux-downloader')
+source=("https://github.com/eoNaho/flux-downloader/releases/download/v${pkgver}/flux-downloader_${pkgver}_amd64.deb")
+sha256sums=('SKIP')
+
+package() {
+  bsdtar -xf "${srcdir}/data.tar"* -C "${pkgdir}/"
+}

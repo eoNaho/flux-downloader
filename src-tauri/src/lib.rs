@@ -441,7 +441,7 @@ pub fn run() {
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             // When a second instance is opened (e.g. via deep link), forward the URL
             for arg in argv.iter().skip(1) {
-                if arg.starts_with("fluxyt://") {
+                if arg.starts_with("fluxdonwloader://") {
                     let _ = app.emit("deep-link-url", arg.clone());
                 }
             }
@@ -450,12 +450,12 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
-        .setup(|app| {
+        .setup(|_app| {
             // Register the deep link protocol at runtime (needed for dev mode)
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
-                let _ = app.deep_link().register("fluxyt");
+                let _ = _app.deep_link().register("fluxdonwloader");
             }
             Ok(())
         })

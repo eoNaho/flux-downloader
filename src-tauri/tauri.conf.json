@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "fluxyt",
+  "productName": "fluxdonwloader",
   "version": "0.1.0",
-  "identifier": "com.naho.fluxyt",
+  "identifier": "com.naho.fluxdonwloader",
   "build": {
     "beforeDevCommand": "bun run dev",
     "devUrl": "http://localhost:1420",
@@ -44,7 +44,7 @@
     },
     "deep-link": {
       "desktop": {
-        "schemes": ["fluxyt"]
+        "schemes": ["fluxdonwloader"]
       }
     }
   }

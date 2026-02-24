@@ -12,7 +12,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-22.04, windows-latest]
+        include:
+          - platform: macos-latest
+            args: "--target aarch64-apple-darwin"
+          - platform: ubuntu-22.04
+            args: ""
+          - platform: windows-latest
+            args: ""
 
     runs-on: ${{ matrix.platform }}
     steps:
@@ -24,16 +30,25 @@ jobs:
           node-version: 20
 
       - name: setup bun
-        uses: oven-sh/setup-bun@v1
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
 
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || '' }}
+
+      - name: cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
 
       - name: install dependencies (ubuntu only)
         if: matrix.platform == 'ubuntu-22.04'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.0-dev libappindicator3-dev librsvg2-dev patchelf
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
 
       # ── Download yt-dlp sidecar ──
       - name: download yt-dlp (Windows)
@@ -86,7 +101,7 @@ jobs:
       - name: install frontend dependencies
         run: bun install
 
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@v0.5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
@@ -105,7 +120,8 @@ jobs:
 
             * 🪟 **Windows**: Download the `.msi` or `.exe` installer.
             * 🍎 **macOS**: Download the `.dmg` file.
-            * 🐧 **Linux**: Download the `.AppImage` (runs anywhere) or `.deb` file.
+            * 🐧 **Linux (Debian/Ubuntu)**: Download the `.AppImage` (runs anywhere) or `.deb` file.
+            * 🐧 **Arch Linux (AUR)**: `yay -S flux-downloader-bin`
 
             ---
 
@@ -113,9 +129,104 @@ jobs:
 
             * **Robust yt-dlp Updater**: The one-click update button in settings now flawlessly downloads the latest engine directly from GitHub, working elegantly across Windows, Mac, and Linux!
             * **Native OS Notifications**: Get sleek native alerts the moment your videos finish downloading.
-            * **Browser Extension Support**: Introducing deep link integration (`fluxyt://`)! Add the Flux Extension to your browser to send URLs straight to the app.
+            * **Browser Extension Support**: Introducing deep link integration (`fluxdonwloader://`)! Add the Flux Extension to your browser to send URLs straight to the app.
             * **Improved Engine**: Major stability fixes for YouTube downloads, progress tracking, and playlist rendering.
 
             Thank you for using Flux Downloader! 💜
           releaseDraft: true
           prerelease: false
+          args: ${{ matrix.args }}
+
+  publish-aur:
+    needs: publish-tauri
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: setup SSH for AUR
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.AUR_SSH_PRIVATE_KEY }}" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
+          cat >> ~/.ssh/config << 'EOF'
+          Host aur.archlinux.org
+            IdentityFile ~/.ssh/aur
+            User aur
+          EOF
+
+      - name: clone AUR repo
+        run: |
+          git clone ssh://aur@aur.archlinux.org/flux-downloader-bin.git /tmp/aur-pkg
+          git -C /tmp/aur-pkg config user.name "GitHub Actions"
+          git -C /tmp/aur-pkg config user.email "actions@github.com"
+
+      - name: update PKGBUILD
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DEB_URL="https://github.com/eoNaho/flux-downloader/releases/download/${GITHUB_REF_NAME}/flux-downloader_${VERSION}_amd64.deb"
+
+          # Fetch the .deb checksum
+          curl -sL "$DEB_URL" -o /tmp/flux.deb
+          SHA256=$(sha256sum /tmp/flux.deb | cut -d' ' -f1)
+
+          cat > /tmp/aur-pkg/PKGBUILD << 'PKGEOF'
+          # Maintainer: Naho <naho@users.noreply.github.com>
+          pkgname=flux-downloader-bin
+          pkgver=VERSION_PLACEHOLDER
+          pkgrel=1
+          pkgdesc="A modern, fast YouTube downloader built with Tauri"
+          arch=('x86_64')
+          url="https://github.com/eoNaho/flux-downloader"
+          license=('MIT')
+          depends=('webkit2gtk-4.1' 'gtk3' 'libsoup3' 'libappindicator-gtk3')
+          provides=('flux-downloader')
+          conflicts=('flux-downloader')
+          source=("https://github.com/eoNaho/flux-downloader/releases/download/v${pkgver}/flux-downloader_${pkgver}_amd64.deb")
+          sha256sums=('SHA256_PLACEHOLDER')
+
+          package() {
+            bsdtar -xf "${srcdir}/data.tar"* -C "${pkgdir}/"
+          }
+          PKGEOF
+
+          # Remove leading whitespace from heredoc (YAML indentation artifact)
+          sed -i 's/^          //' /tmp/aur-pkg/PKGBUILD
+          # Replace placeholders
+          sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" /tmp/aur-pkg/PKGBUILD
+          sed -i "s/SHA256_PLACEHOLDER/${SHA256}/g" /tmp/aur-pkg/PKGBUILD
+
+      - name: generate .SRCINFO and push
+        run: |
+          cd /tmp/aur-pkg
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA256=$(grep sha256sums PKGBUILD | cut -d"'" -f2)
+          cat > .SRCINFO << SRCEOF
+          pkgbase = flux-downloader-bin
+          	pkgdesc = A modern, fast YouTube downloader built with Tauri
+          	pkgver = ${VERSION}
+          	pkgrel = 1
+          	url = https://github.com/eoNaho/flux-downloader
+          	arch = x86_64
+          	license = MIT
+          	depends = webkit2gtk-4.1
+          	depends = gtk3
+          	depends = libsoup3
+          	depends = libappindicator-gtk3
+          	provides = flux-downloader
+          	conflicts = flux-downloader
+          	source = https://github.com/eoNaho/flux-downloader/releases/download/v${VERSION}/flux-downloader_${VERSION}_amd64.deb
+          	sha256sums = ${SHA256}
+
+          pkgname = flux-downloader-bin
+          SRCEOF
+          # Remove leading whitespace from heredoc
+          sed -i 's/^          //' .SRCINFO
+
+          git add -A
+          git commit -m "Update to v${VERSION}" || echo "No changes to commit"
+          git push
