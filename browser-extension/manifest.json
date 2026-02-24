@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Flux-Downloader — Send to App",
+  "description": "Send the current page URL to Flux-Downloader for download",
+  "version": "1.0.0",
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png"
+  },
+  "action": {
+    "default_title": "Send to Flux-Downloader",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "permissions": ["activeTab", "scripting"]
+}
