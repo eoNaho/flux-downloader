@@ -71,7 +71,11 @@
     "ytdlp_updating": "Updating...",
     "ytdlp_updated": "yt-dlp updated successfully!",
     "ytdlp_update_error": "Failed to update yt-dlp",
-    "ytdlp_loading": "Loading..."
+    "ytdlp_loading": "Loading...",
+    "app_update": "Update App",
+    "app_downloading": "Downloading update...",
+    "app_installing": "Installing...",
+    "app_restart": "Restarting..."
   },
   "new_download": {
     "title": "New Download",

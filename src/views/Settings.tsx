@@ -1,11 +1,9 @@
-import { check } from "@tauri-apps/plugin-updater";
-import { RefreshCw, Github, Download } from "lucide-react";
-import { useState } from "react";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { RefreshCw, Github, Download, FolderOpen } from "lucide-react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
-
 import { open } from "@tauri-apps/plugin-dialog";
-import { FolderOpen } from "lucide-react";
-import { useEffect } from "react";
 import { useTranslation } from "../i18n/config";
 import { useLanguageStore } from "../store/languageStore";
 
@@ -19,6 +17,8 @@ export function Settings() {
   const [ytdlpUpdateResult, setYtdlpUpdateResult] = useState<string | null>(
     null,
   );
+  const [pendingUpdate, setPendingUpdate] = useState<Update | null>(null);
+  const [appUpdating, setAppUpdating] = useState(false);
 
   useEffect(() => {
     const savedPath = localStorage.getItem("settings-default-path");
@@ -35,6 +35,9 @@ export function Settings() {
     invoke<string>("get_ytdlp_version")
       .then((v) => setYtdlpVersion(v))
       .catch(() => setYtdlpVersion("???"));
+
+    // Auto-check for app updates on mount
+    checkForUpdates();
   }, []);
 
   const handleSelectDefaultPath = async () => {
@@ -56,12 +59,48 @@ export function Settings() {
       const update = await check();
       if (update?.available) {
         setStatus(`${t("settings.update_available")}: ${update.version}`);
+        setPendingUpdate(update);
       } else {
         setStatus(t("settings.up_to_date"));
+        setPendingUpdate(null);
       }
     } catch (error) {
       console.error(error);
       setStatus(t("settings.check_error"));
+    }
+  };
+
+  const handleUpdateApp = async () => {
+    if (!pendingUpdate) return;
+    setAppUpdating(true);
+    try {
+      setStatus(t("settings.app_downloading"));
+      let downloaded = 0;
+      let contentLength = 0;
+      await pendingUpdate.downloadAndInstall((event) => {
+        switch (event.event) {
+          case "Started":
+            contentLength = event.data.contentLength ?? 0;
+            break;
+          case "Progress": {
+            downloaded += event.data.chunkLength;
+            if (contentLength > 0) {
+              const pct = Math.round((downloaded / contentLength) * 100);
+              setStatus(`${t("settings.app_downloading")} ${pct}%`);
+            }
+            break;
+          }
+          case "Finished":
+            setStatus(t("settings.app_installing"));
+            break;
+        }
+      });
+      setStatus(t("settings.app_restart"));
+      await relaunch();
+    } catch (error) {
+      console.error(error);
+      setStatus(`${t("settings.check_error")} ${error}`);
+      setAppUpdating(false);
     }
   };
 
@@ -154,13 +193,31 @@ export function Settings() {
               </h3>
               <p className="text-sm text-zinc-500">v0.1.1-alpha</p>
             </div>
-            <button
-              onClick={checkForUpdates}
-              className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-4 py-2 rounded-lg transition-colors text-sm font-medium"
-            >
-              <RefreshCw size={16} />
-              {t("settings.check_updates")}
-            </button>
+            <div className="flex gap-2">
+              {pendingUpdate && (
+                <button
+                  onClick={handleUpdateApp}
+                  disabled={appUpdating}
+                  className="flex items-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
+                >
+                  {appUpdating ? (
+                    <RefreshCw size={16} className="animate-spin" />
+                  ) : (
+                    <Download size={16} />
+                  )}
+                  {appUpdating
+                    ? t("settings.app_downloading")
+                    : t("settings.app_update")}
+                </button>
+              )}
+              <button
+                onClick={checkForUpdates}
+                className="flex items-center gap-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 px-4 py-2 rounded-lg transition-colors text-sm font-medium"
+              >
+                <RefreshCw size={16} />
+                {t("settings.check_updates")}
+              </button>
+            </div>
           </div>
           <div className="p-6 flex items-center justify-between">
             <div>
