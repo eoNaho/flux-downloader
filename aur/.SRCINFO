@@ -11,7 +11,7 @@ pkgbase = flux-downloader-bin
 	depends = libappindicator-gtk3
 	provides = flux-downloader
 	conflicts = flux-downloader
-	source = https://github.com/eoNaho/flux-downloader/releases/download/v0.1.0/flux-downloader_0.1.0_amd64.deb
+	source = https://github.com/eoNaho/flux-downloader/releases/download/v0.1.0/fluxdownloader_0.1.0_amd64.deb
 	sha256sums = SKIP
 
 pkgname = flux-downloader-bin
