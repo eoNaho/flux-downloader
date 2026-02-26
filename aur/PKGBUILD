@@ -9,7 +9,7 @@ license=('MIT')
 depends=('webkit2gtk-4.1' 'gtk3' 'libsoup3' 'libappindicator-gtk3')
 provides=('flux-downloader')
 conflicts=('flux-downloader')
-source=("https://github.com/eoNaho/flux-downloader/releases/download/v${pkgver}/flux-downloader_${pkgver}_amd64.deb")
+source=("https://github.com/eoNaho/flux-downloader/releases/download/v${pkgver}/fluxdownloader_${pkgver}_amd64.deb")
 sha256sums=('SKIP')
 
 package() {
