@@ -7,6 +7,7 @@ import {
   Folder,
   Pause,
   Loader2,
+  X,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type Event } from "@tauri-apps/api/event";
@@ -75,8 +76,14 @@ export function Queue() {
             const percentageMatch = line.match(/(\d+(?:\.\d+)?)\s*%/);
             const speedMatch = line.match(/at\s+(.+?)\s+ETA/);
             const etaMatch = line.match(/ETA\s+(.+)$/);
+            const fileSavedMatch = line.match(/FILE_SAVED_AT:\s+(.+)/);
 
-            if (percentageMatch) {
+            if (fileSavedMatch) {
+              const rawPath = fileSavedMatch[1].trim();
+              // Remove surrounding quotes if yt-dlp output them (common on Windows)
+              const exactPath = rawPath.replace(/^["'](.*)["']$/, "$1");
+              updateItem(item.id, { exactPath });
+            } else if (percentageMatch) {
               updateItem(item.id, {
                 progress: parseFloat(percentageMatch[1]),
                 speed: speedMatch ? speedMatch[1].trim() : "-",
@@ -87,6 +94,7 @@ export function Queue() {
         );
 
         await invoke("download_video", {
+          id: item.id,
           url: item.url,
           path: item.path,
           formatId: item.formatId || null,
@@ -98,27 +106,44 @@ export function Queue() {
         });
 
         unlisten();
-        updateItem(item.id, { status: "completed", progress: 100 });
 
-        notifyDownloadComplete(item);
+        // Check if the item is still in the store before marking completed
+        // (It might have been removed/cancelled by the user)
+        const stillExists = useQueueStore
+          .getState()
+          .items.some((i) => i.id === item.id);
+        if (stillExists) {
+          updateItem(item.id, { status: "completed", progress: 100 });
+          notifyDownloadComplete(item);
 
-        try {
-          const historyItem = {
-            ...item,
-            status: "completed" as const,
-            progress: 100,
-          };
-          const existingJson = localStorage.getItem("download-history");
-          const existing = existingJson ? JSON.parse(existingJson) : [];
-          existing.push(historyItem);
-          localStorage.setItem("download-history", JSON.stringify(existing));
-          window.dispatchEvent(new Event("history-updated"));
-        } catch (e) {
-          console.error("Failed to save history", e);
+          try {
+            // Get the updated item with the exactPath
+            const updatedItem =
+              useQueueStore.getState().items.find((i) => i.id === item.id) ||
+              item;
+
+            const historyItem = {
+              ...updatedItem,
+              status: "completed" as const,
+              progress: 100,
+            };
+            const existingJson = localStorage.getItem("download-history");
+            const existing = existingJson ? JSON.parse(existingJson) : [];
+            existing.push(historyItem);
+            localStorage.setItem("download-history", JSON.stringify(existing));
+            window.dispatchEvent(new Event("history-updated"));
+          } catch (e) {
+            console.error("Failed to save history", e);
+          }
         }
       } catch (e) {
-        console.error(e);
-        updateItem(item.id, { status: "error", error: String(e) });
+        console.error("Download failed or cancelled:", e);
+        const stillExists = useQueueStore
+          .getState()
+          .items.some((i) => i.id === item.id);
+        if (stillExists) {
+          updateItem(item.id, { status: "error", error: String(e) });
+        }
       }
 
       currentItems = useQueueStore.getState().items;
@@ -180,7 +205,14 @@ export function Queue() {
             <DownloadItemCard
               key={item.id}
               item={item}
-              onRemove={() => removeItem(item.id)}
+              onRemove={async () => {
+                if (item.status === "downloading") {
+                  await invoke("cancel_download", { id: item.id }).catch(
+                    console.error,
+                  );
+                }
+                removeItem(item.id);
+              }}
             />
           ))}
           {items.length === 0 && (
@@ -242,7 +274,7 @@ function DownloadItemCard({
         </div>
 
         {!isCompleted && !isError ? (
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 flex-1 p-2">
             <div className="h-1.5 w-full bg-zinc-800 rounded-full overflow-hidden">
               <div
                 className="h-full bg-purple-500 transition-all duration-500 relative"
@@ -250,19 +282,19 @@ function DownloadItemCard({
               ></div>
             </div>
             <div className="flex items-center justify-between text-xs text-zinc-500">
-              <span className="text-purple-400 font-medium">
+              <span className="text-purple-400 font-medium pt-1">
                 {item.status === "queued"
                   ? t("queue.item_queued")
                   : t("queue.item_downloading")}
               </span>
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-1">
                 <span>{item.speed}</span>
                 <span className="text-zinc-400">ETA: {item.eta}</span>
               </div>
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between mt-2">
+          <div className="flex items-center justify-between mt-2 p-2">
             <span
               className={`text-xs font-medium flex items-center gap-1.5 ${
                 isError ? "text-red-500" : "text-emerald-500"
@@ -284,15 +316,28 @@ function DownloadItemCard({
               >
                 <Folder className="w-4 h-4" />
               </button>
-              <button
-                className="p-1.5 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-                title="Remover"
-                onClick={onRemove}
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
             </div>
           </div>
+        )}
+      </div>
+
+      <div className="ml-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity flex-col justify-center border-l border-white/5 pl-4">
+        {!isCompleted && !isError ? (
+          <button
+            className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+            title="Cancelar Download"
+            onClick={onRemove}
+          >
+            <X className="w-5 h-5" />
+          </button>
+        ) : (
+          <button
+            className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+            title="Remover"
+            onClick={onRemove}
+          >
+            <Trash2 className="w-5 h-5" />
+          </button>
         )}
       </div>
     </div>

@@ -5,10 +5,17 @@ fn greet(name: &str) -> String {
 }
 
 use tauri_plugin_shell::ShellExt;
-use tauri_plugin_shell::process::CommandEvent;
+use tauri_plugin_shell::process::{CommandEvent, CommandChild};
 use tauri::Emitter;
 use tauri::Manager;
 use base64::Engine;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+pub struct AppState {
+    pub active_downloads: Arc<Mutex<HashMap<String, CommandChild>>>,
+}
 
 fn get_ytdlp_command(app: &tauri::AppHandle) -> Result<tauri_plugin_shell::process::Command, String> {
     let mut data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
@@ -27,6 +34,7 @@ fn get_ytdlp_command(app: &tauri::AppHandle) -> Result<tauri_plugin_shell::proce
 #[tauri::command]
 async fn download_video(
     app: tauri::AppHandle,
+    id: String,
     url: String,
     path: String,
     format_id: Option<String>,
@@ -68,9 +76,13 @@ async fn download_video(
         "mp4".to_string(),
         "-P".to_string(),
         path,
+        "--restrict-filenames".to_string(),
         "--newline".to_string(),
         "--progress-template".to_string(),
         "download:%(progress._percent_str)s at %(progress._speed_str)s ETA %(progress._eta_str)s".to_string(), 
+        // Use --print to output the final merged filepath natively, bypassing cmd.exe unicode corruption
+        "--print".to_string(),
+        "after_move:FILE_SAVED_AT: %(filepath)s".to_string(),
     ];
 
     // Cookies from browser
@@ -122,10 +134,16 @@ async fn download_video(
     // URL must be the LAST argument for yt-dlp
     args.push(url);
 
-    let (mut rx, _child) = sidecar_command
+    let (mut rx, child) = sidecar_command
         .args(args)
         .spawn()
         .map_err(|e| e.to_string())?;
+
+    {
+        let state = app.state::<AppState>();
+        let mut map = state.active_downloads.lock().await;
+        map.insert(id.clone(), child);
+    }
 
     // Read events until the process exits, capturing the exit code and stderr
     let mut exit_code: Option<i32> = None;
@@ -152,6 +170,13 @@ async fn download_video(
         }
     }
 
+    // Remove the process from active downloads
+    {
+        let state = app.state::<AppState>();
+        let mut map = state.active_downloads.lock().await;
+        map.remove(&id);
+    }
+
     // Check the exit code of yt-dlp
     match exit_code {
         Some(0) => Ok(()),
@@ -163,8 +188,18 @@ async fn download_video(
             };
             Err(msg)
         }
-        None => Err("Download failed – yt-dlp was terminated by signal".into()),
+        None => Err("Download cancelled by user".into()),
     }
+}
+
+#[tauri::command]
+async fn cancel_download(app: tauri::AppHandle, id: String) -> Result<(), String> {
+    let state = app.state::<AppState>();
+    let mut map = state.active_downloads.lock().await;
+    if let Some(child) = map.remove(&id) {
+        let _ = child.kill();
+    }
+    Ok(())
 }
 
 #[derive(serde::Serialize)]
@@ -442,6 +477,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
@@ -465,7 +501,10 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![greet, download_video, get_video_metadata, fetch_image_base64, open_folder, get_download_dir, get_ytdlp_version, update_ytdlp])
+        .manage(AppState {
+            active_downloads: Arc::new(Mutex::new(HashMap::new())),
+        })
+        .invoke_handler(tauri::generate_handler![greet, download_video, cancel_download, get_video_metadata, fetch_image_base64, open_folder, get_download_dir, get_ytdlp_version, update_ytdlp])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

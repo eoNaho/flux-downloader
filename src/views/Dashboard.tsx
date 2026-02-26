@@ -51,9 +51,11 @@ interface DashboardProps {
 }
 
 import { ProxyImage } from "../components/ProxyImage";
+import { useToast } from "../components/Toast";
 
 export function Dashboard({ onStartDownload }: DashboardProps) {
   const { t } = useTranslation();
+  const { toast } = useToast();
   const [url, setUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDownloading] = useState(false);
@@ -63,6 +65,9 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
   const [downloadPath, setDownloadPath] = useState<string>("Downloads");
   const [realPath, setRealPath] = useState<string>("");
   const [subtitles, setSubtitles] = useState(false);
+  const [isMultiLink, setIsMultiLink] = useState(false);
+  const [multiLinksText, setMultiLinksText] = useState("");
+  const [isBatchQueuing, setIsBatchQueuing] = useState(false);
 
   // Resolve the real Downloads directory on first launch
   useEffect(() => {
@@ -130,9 +135,9 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
         else if (data.formats.length > 0)
           setSelectedFormat(data.formats[data.formats.length - 1].format_id);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      alert("Failed to analyze video: " + error);
+      toast("Failed to analyze video: " + (error?.message || error), "error");
     } finally {
       setIsAnalyzing(false);
     }
@@ -206,7 +211,7 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
       endTime: endTime || undefined,
       cookiesBrowser: cookiesBrowser !== "none" ? cookiesBrowser : undefined,
     });
-    alert(t("dashboard.add_to_queue") + "!");
+    toast(t("dashboard.add_to_queue") + "!", "success");
   };
 
   const handlePlaylistBatchQueue = () => {
@@ -233,10 +238,89 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
       });
     });
 
-    alert(`Added ${selectedEntries.length} items to Queue!`);
+    useQueueStore.getState().setProcessing(true);
+    toast(`Added ${selectedEntries.length} items to Queue!`, "success");
     setShowPlaylistModal(false);
     setMetadata(null);
     setUrl("");
+  };
+
+  const handleMultiLinkQueue = async () => {
+    const urls = multiLinksText
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+
+    if (urls.length === 0) return;
+
+    setIsBatchQueuing(true);
+    const isAudio = activeTab === "audio";
+
+    for (const u of urls) {
+      try {
+        const data = await invoke<VideoMetadata>("get_video_metadata", {
+          url: u,
+        });
+
+        let formatId = null;
+        let resLabel = isAudio ? "Audio" : "Auto";
+
+        if (!isAudio) {
+          const bestVideo = data.formats
+            .slice()
+            .reverse()
+            .find((f) => f.resolution !== "Audio Only");
+          if (bestVideo) {
+            formatId = bestVideo.format_id;
+            resLabel = bestVideo.resolution;
+          } else if (data.formats.length > 0) {
+            formatId = data.formats[data.formats.length - 1].format_id;
+          }
+        } else {
+          const bestAudio = data.formats
+            .filter((f) => f.resolution === "Audio Only")
+            .slice()
+            .reverse()[0];
+          if (bestAudio) formatId = bestAudio.format_id;
+        }
+
+        useQueueStore.getState().addItem({
+          url: u,
+          title: data.title,
+          thumbnail: data.thumbnail,
+          duration: data.duration,
+          uploader: data.uploader,
+          formatId: formatId,
+          isAudio,
+          resolution: resLabel,
+          path: realPath,
+          subtitles,
+          cookiesBrowser:
+            cookiesBrowser !== "none" ? cookiesBrowser : undefined,
+        });
+      } catch (err) {
+        console.error("Failed to fetch metadata for", u, err);
+        useQueueStore.getState().addItem({
+          url: u,
+          title: "Error fetching: " + u,
+          thumbnail: "",
+          duration: "",
+          uploader: "",
+          formatId: null,
+          isAudio,
+          resolution: isAudio ? "Audio" : "Auto",
+          path: realPath,
+          subtitles,
+          cookiesBrowser:
+            cookiesBrowser !== "none" ? cookiesBrowser : undefined,
+        });
+      }
+    }
+
+    setIsBatchQueuing(false);
+    useQueueStore.getState().setProcessing(true);
+    toast(t("dashboard.add_to_queue") + ` (${urls.length} items)!`, "success");
+    setMultiLinksText("");
   };
 
   const videoFormats =
@@ -275,42 +359,127 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
         </div>
 
         <div className="bg-zinc-900/50 border border-white/10 rounded-2xl p-2 shadow-2xl shadow-black/50 backdrop-blur-xl mb-12 transform hover:scale-[1.01] transition-transform duration-300">
-          <div className="flex flex-col md:flex-row gap-2">
-            <div className="flex-1 relative">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500">
-                <Link className="w-5 h-5" />
-              </div>
-              <input
-                type="text"
-                placeholder={t("dashboard.input_placeholder")}
-                className="w-full h-14 bg-transparent border-none pl-12 pr-4 text-white placeholder:text-zinc-600 focus:outline-none text-lg font-medium"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
-              />
-            </div>
+          <div className="flex items-center gap-4 mb-3 px-2 pt-2">
             <button
-              onClick={handleAnalyze}
-              disabled={isAnalyzing || !url}
+              onClick={() => setIsMultiLink(false)}
               className={clsx(
-                "h-14 px-8 rounded-xl font-bold text-white transition-all duration-300 flex items-center justify-center gap-2 min-w-[160px]",
-                isAnalyzing
-                  ? "bg-zinc-800 cursor-not-allowed"
-                  : "bg-gradient-to-r from-purple-600 to-blue-600 hover:shadow-lg hover:shadow-purple-500/25 active:scale-95",
+                "text-sm font-bold pb-1 transition-colors",
+                !isMultiLink
+                  ? "text-white border-b-2 border-purple-500"
+                  : "text-zinc-500 hover:text-white",
               )}
             >
-              {isAnalyzing ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>{t("dashboard.analyzing")}</span>
-                </>
-              ) : (
-                <>
-                  <span>{t("dashboard.analyze_button")}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
+              Single Link
             </button>
+            <button
+              onClick={() => setIsMultiLink(true)}
+              className={clsx(
+                "text-sm font-bold pb-1 transition-colors",
+                isMultiLink
+                  ? "text-white border-b-2 border-purple-500"
+                  : "text-zinc-500 hover:text-white",
+              )}
+            >
+              Multiple Links
+            </button>
+          </div>
+
+          <div className="flex flex-col md:flex-row gap-2">
+            <div className="flex-1 relative">
+              <div className="absolute left-4 top-4 text-zinc-500">
+                <Link className="w-5 h-5" />
+              </div>
+              {!isMultiLink ? (
+                <input
+                  type="text"
+                  placeholder={t("dashboard.input_placeholder")}
+                  className="w-full h-14 bg-transparent border-none pl-12 pr-4 text-white placeholder:text-zinc-600 focus:outline-none text-lg font-medium"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
+                />
+              ) : (
+                <textarea
+                  placeholder="Paste multiple links here, one per line..."
+                  className="w-full h-32 bg-transparent border-none pl-12 pr-4 pt-4 text-white placeholder:text-zinc-600 focus:outline-none text-base font-medium resize-none"
+                  value={multiLinksText}
+                  onChange={(e) => setMultiLinksText(e.target.value)}
+                />
+              )}
+            </div>
+
+            {!isMultiLink ? (
+              <button
+                onClick={handleAnalyze}
+                disabled={isAnalyzing || !url}
+                className={clsx(
+                  "h-14 px-8 rounded-xl font-bold text-white transition-all duration-300 flex items-center justify-center gap-2 min-w-[160px]",
+                  isAnalyzing
+                    ? "bg-zinc-800 cursor-not-allowed"
+                    : "bg-gradient-to-r from-purple-600 to-blue-600 hover:shadow-lg hover:shadow-purple-500/25 active:scale-95",
+                )}
+              >
+                {isAnalyzing ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>{t("dashboard.analyzing")}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{t("dashboard.analyze_button")}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            ) : (
+              <div className="flex flex-col gap-2 min-w-[160px]">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setActiveTab("video")}
+                    className={clsx(
+                      "flex-1 h-10 rounded-lg font-bold text-sm transition-colors border",
+                      activeTab === "video"
+                        ? "bg-purple-600 border-purple-500 text-white"
+                        : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white",
+                    )}
+                  >
+                    Video
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("audio")}
+                    className={clsx(
+                      "flex-1 h-10 rounded-lg font-bold text-sm transition-colors border",
+                      activeTab === "audio"
+                        ? "bg-purple-600 border-purple-500 text-white"
+                        : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white",
+                    )}
+                  >
+                    Audio
+                  </button>
+                </div>
+                <button
+                  onClick={handleMultiLinkQueue}
+                  disabled={!multiLinksText || isBatchQueuing}
+                  className={clsx(
+                    "flex-1 px-4 rounded-xl font-bold text-white transition-all duration-300 flex items-center justify-center gap-2",
+                    !multiLinksText || isBatchQueuing
+                      ? "bg-zinc-800 cursor-not-allowed"
+                      : "bg-gradient-to-r from-purple-600 to-blue-600 hover:shadow-lg hover:shadow-purple-500/25 active:scale-95",
+                  )}
+                >
+                  {isBatchQueuing ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <ListPlus className="w-5 h-5" />
+                  )}
+                  <span>
+                    {isBatchQueuing
+                      ? "Fetching..."
+                      : `Add ${multiLinksText.split("\n").filter((l) => l.trim().length > 0).length} to Queue`}
+                  </span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

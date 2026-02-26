@@ -20,12 +20,13 @@ export interface DownloadItem {
   speed: string;
   eta: string;
   error?: string;
+  exactPath?: string; // the actual file path of the completed download
 }
 
 interface QueueState {
   items: DownloadItem[];
   addItem: (
-    item: Omit<DownloadItem, "id" | "status" | "progress" | "speed" | "eta">
+    item: Omit<DownloadItem, "id" | "status" | "progress" | "speed" | "eta">,
   ) => void;
   removeItem: (id: string) => void;
   updateItem: (id: string, updates: Partial<DownloadItem>) => void;

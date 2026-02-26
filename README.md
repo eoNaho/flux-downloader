@@ -2,7 +2,12 @@
 
 A modern, fast, and feature-rich YouTube Downloader built with **Tauri**, **React**, **TypeScript**, and **Vite**.
 
-![Flux Downloader](public/vite.svg)
+<div align="center">
+  <img src="screenshot/1.png" alt="Dashboard" width="400" />
+  <img src="screenshot/2.png" alt="Playlist Modal" width="400" />
+  <img src="screenshot/3.png" alt="Download Queue" width="400" />
+  <img src="screenshot/4.png" alt="History & Mini-Player" width="400" />
+</div>
 
 ## Features
 

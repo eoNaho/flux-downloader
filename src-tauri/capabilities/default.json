@@ -17,6 +17,12 @@
     "process:default",
     "dialog:default",
     "notification:default",
-    "deep-link:default"
+    "deep-link:default",
+    "fs:default",
+    "fs:allow-read-file",
+    {
+      "identifier": "fs:scope",
+      "allow": [{ "path": "**" }]
+    }
   ]
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ToastProvider } from "./components/Toast";
 import "./App.css";
 import { Sidebar } from "./components/Sidebar";
 import { useQueueStore } from "./store/queueStore";
@@ -58,29 +59,31 @@ function App() {
   };
 
   return (
-    <div className="flex w-screen h-screen bg-black text-zinc-100 font-sans selection:bg-purple-500/30 overflow-hidden pt-8">
-      <Titlebar />
-      <Sidebar
-        currentView={currentView}
-        onViewChange={setCurrentView}
-        queueCount={queueCount}
-      />
+    <ToastProvider>
+      <div className="flex w-screen h-screen bg-black text-zinc-100 font-sans selection:bg-purple-500/30 overflow-hidden pt-8">
+        <Titlebar />
+        <Sidebar
+          currentView={currentView}
+          onViewChange={setCurrentView}
+          queueCount={queueCount}
+        />
 
-      <main className="flex-1 flex flex-col h-full overflow-hidden bg-zinc-950 relative">
-        <div className="absolute top-20 left-20 h-72 w-72 rounded-full bg-purple-500/20 blur-3xl pointer-events-none" />
-        <div className="absolute top-32 left-32 h-96 w-96 rounded-full bg-purple-500/10 blur-[80px] pointer-events-none" />
+        <main className="flex-1 flex flex-col h-full overflow-hidden bg-zinc-950 relative">
+          <div className="absolute top-20 left-20 h-72 w-72 rounded-full bg-purple-500/20 blur-3xl pointer-events-none" />
+          <div className="absolute top-32 left-32 h-96 w-96 rounded-full bg-purple-500/10 blur-[80px] pointer-events-none" />
 
-        <div className="absolute bottom-20 right-20 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl pointer-events-none" />
-        <div className="absolute bottom-32 right-32 h-96 w-96 rounded-full bg-blue-500/10 blur-[80px] pointer-events-none" />
+          <div className="absolute bottom-20 right-20 h-72 w-72 rounded-full bg-blue-500/20 blur-3xl pointer-events-none" />
+          <div className="absolute bottom-32 right-32 h-96 w-96 rounded-full bg-blue-500/10 blur-[80px] pointer-events-none" />
 
-        {currentView === "dashboard" && (
-          <Dashboard onStartDownload={navigateToQueue} />
-        )}
-        {currentView === "queue" && <Queue />}
-        {currentView === "history" && <History />}
-        {currentView === "settings" && <Settings />}
-      </main>
-    </div>
+          {currentView === "dashboard" && (
+            <Dashboard onStartDownload={navigateToQueue} />
+          )}
+          {currentView === "queue" && <Queue />}
+          {currentView === "history" && <History />}
+          {currentView === "settings" && <Settings />}
+        </main>
+      </div>
+    </ToastProvider>
   );
 }
 

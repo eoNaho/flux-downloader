@@ -19,7 +19,11 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:1420 ws://localhost:1420; img-src 'self' data: blob: https:;"
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:1420 ws://localhost:1420; img-src 'self' data: blob: https: asset: http://tauri.localhost:*; media-src 'self' asset: http://tauri.localhost:*;",
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["**"]
+      }
     }
   },
   "bundle": {
