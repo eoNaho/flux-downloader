@@ -127,10 +127,12 @@ jobs:
 
             ### ✨ What's New
 
-            * **Robust yt-dlp Updater**: The one-click update button in settings now flawlessly downloads the latest engine directly from GitHub, working elegantly across Windows, Mac, and Linux!
-            * **Native OS Notifications**: Get sleek native alerts the moment your videos finish downloading.
-            * **Browser Extension Support**: Introducing deep link integration (`fluxdownloader://`)! Add the Flux Extension to your browser to send URLs straight to the app.
-            * **Improved Engine**: Major stability fixes for YouTube downloads, progress tracking, and playlist rendering.
+            * **File Import for Batch Downloads**: Import a `.txt`, `.csv`, or `.xlsx` file containing URLs and add them all to the queue at once. Choose between Video, Audio, or Auto (maximum quality) mode.
+            * **Auto Quality Mode**: When importing files, the new Auto mode lets yt-dlp pick the best available video and audio streams automatically — no manual format selection needed.
+            * **Per-Download Progress Tracking**: Download progress events are now scoped per item, preventing any data mixing when multiple items are queued.
+            * **Settings Sync**: Changing the default download path in Settings now updates the Dashboard instantly, without needing to restart the app.
+            * **Playlist URL Fix**: Playlist downloads now use the original URL from each entry, making non-YouTube playlists work correctly.
+            * **Full Internationalization**: All remaining hardcoded strings are now properly translated in both English and Portuguese (BR).
 
             Thank you for using Flux Downloader! 💜
           releaseDraft: false
@@ -189,7 +191,7 @@ jobs:
           SHA256=$(grep "sha256sums=" PKGBUILD | sed "s/sha256sums=('//;s/')//" )
           printf '%s\n' \
             "pkgbase = flux-downloader-bin" \
-            "	pkgdesc = "A modern, fast YouTube downloader built with Tauri" \
+            "	pkgdesc = A modern, fast YouTube downloader built with Tauri" \
             "	pkgver = ${VERSION}" \
             "	pkgrel = 1" \
             "	url = https://github.com/eoNaho/flux-downloader" \
