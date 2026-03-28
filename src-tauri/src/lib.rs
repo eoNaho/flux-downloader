@@ -1,9 +1,3 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
 use tauri_plugin_shell::ShellExt;
 use tauri_plugin_shell::process::{CommandEvent, CommandChild};
 use tauri::Emitter;
@@ -148,15 +142,16 @@ async fn download_video(
     // Read events until the process exits, capturing the exit code and stderr
     let mut exit_code: Option<i32> = None;
     let mut last_stderr = String::new();
+    let event_name = format!("download-progress:{}", id);
     while let Some(event) = rx.recv().await {
         match event {
             CommandEvent::Stdout(line) => {
                 let line_str = String::from_utf8_lossy(&line);
-                let _ = app.emit("download-progress", line_str.to_string());
+                let _ = app.emit(&event_name, line_str.to_string());
             }
             CommandEvent::Stderr(line) => {
                 let line_str = String::from_utf8_lossy(&line).to_string();
-                let _ = app.emit("download-progress", line_str.clone());
+                let _ = app.emit(&event_name, line_str.clone());
                 // Keep the last non-empty stderr line for error reporting
                 let trimmed = line_str.trim().to_string();
                 if !trimmed.is_empty() {
@@ -218,6 +213,7 @@ struct PlaylistEntry {
     duration: String, // formatted
     uploader: String,
     thumbnail: String,
+    url: Option<String>,
 }
 
 #[derive(serde::Serialize)]
@@ -261,13 +257,15 @@ async fn get_video_metadata(app: tauri::AppHandle, url: String) -> Result<VideoM
                               let t = item["title"].as_str().unwrap_or("Unknown Video").to_string();
                               let dur_sec = item["duration"].as_f64().unwrap_or(0.0);
                               let up = item["uploader"].as_str().unwrap_or("").to_string();
-                              
+                              let entry_url = item["url"].as_str().map(|s| s.to_string());
+
                               entries.push(PlaylistEntry {
                                   id: id.clone(),
                                   title: t,
                                   duration: format_duration(dur_sec),
                                   uploader: up,
                                   thumbnail: format!("https://i.ytimg.com/vi/{}/mqdefault.jpg", id),
+                                  url: entry_url,
                               });
                           }
                       }
@@ -504,7 +502,7 @@ pub fn run() {
         .manage(AppState {
             active_downloads: Arc::new(Mutex::new(HashMap::new())),
         })
-        .invoke_handler(tauri::generate_handler![greet, download_video, cancel_download, get_video_metadata, fetch_image_base64, open_folder, get_download_dir, get_ytdlp_version, update_ytdlp])
+        .invoke_handler(tauri::generate_handler![download_video, cancel_download, get_video_metadata, fetch_image_base64, open_folder, get_download_dir, get_ytdlp_version, update_ytdlp])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

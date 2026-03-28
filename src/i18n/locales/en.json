@@ -20,7 +20,15 @@
     "end_time_placeholder": "End (e.g. 01:30)",
     "playlist_modal_title": "Select Videos from Playlist",
     "playlist_select_all": "Select All",
-    "playlist_add_selected": "Add Selected to Queue"
+    "playlist_add_selected": "Add Selected to Queue",
+    "single_link_tab": "Single Link",
+    "multi_link_tab": "Multiple Links",
+    "import_file_tab": "Import File",
+    "multi_link_placeholder": "Paste multiple links here, one per line...",
+    "fetching": "Fetching...",
+    "add_n_to_queue": "Add {{count}} to Queue",
+    "error_fetching": "Error fetching: ",
+    "added_to_queue_batch": "Added {{count}} items to Queue!"
   },
   "sidebar": {
     "dashboard": "Dashboard",
@@ -40,14 +48,22 @@
     "item_completed": "Completed",
     "error": "Download Error",
     "completed": "Completed",
-    "open_folder": "Open Folder"
+    "open_folder": "Open Folder",
+    "cancel_download": "Cancel Download",
+    "remove": "Remove",
+    "notification_title": "Download Complete ✅",
+    "notification_body": "Saved successfully!"
   },
   "history": {
     "title": "History",
     "subtitle": "Manage your completed downloads.",
     "empty": "No download history found.",
     "search_placeholder": "Search...",
-    "clear_all": "Clear History"
+    "clear_all": "Clear History",
+    "clear_dialog_description": "Are you sure you want to clear the entire history? This does not delete your downloaded files.",
+    "clear_dialog_confirm": "Clear History",
+    "clear_dialog_cancel": "Cancel",
+    "loading": "Loading..."
   },
   "settings": {
     "title": "Settings",
@@ -104,5 +120,14 @@
     "videos": "Videos",
     "audios": "Audios",
     "top_format": "Top Format"
+  },
+  "import_file": {
+    "select_file": "Select File",
+    "select_file_hint": "Select a .txt, .csv or .xlsx file with one URL per line/cell",
+    "change_file": "Change File",
+    "urls_found": "{{count}} URLs found",
+    "no_urls": "No valid URLs found in file",
+    "add_to_queue": "Add {{count}} to Queue",
+    "auto": "Auto"
   }
 }

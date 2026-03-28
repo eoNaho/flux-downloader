@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { readTextFile, readFile } from "@tauri-apps/plugin-fs";
+import * as XLSX from "xlsx";
 import {
   Download,
   Link,
@@ -15,6 +17,7 @@ import {
   BarChart3,
   FileVideo,
   FileAudio,
+  FileUp,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useQueueStore } from "../store/queueStore";
@@ -34,6 +37,7 @@ interface PlaylistEntry {
   duration: string;
   uploader: string;
   thumbnail: string;
+  url?: string;
 }
 
 interface VideoMetadata {
@@ -58,36 +62,48 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
   const { toast } = useToast();
   const [url, setUrl] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isDownloading] = useState(false);
   const [metadata, setMetadata] = useState<VideoMetadata | null>(null);
   const [activeTab, setActiveTab] = useState<"video" | "audio">("video");
   const [selectedFormat, setSelectedFormat] = useState<string>("");
   const [downloadPath, setDownloadPath] = useState<string>("Downloads");
   const [realPath, setRealPath] = useState<string>("");
   const [subtitles, setSubtitles] = useState(false);
-  const [isMultiLink, setIsMultiLink] = useState(false);
+  const [inputMode, setInputMode] = useState<"single" | "multi" | "import">("single");
   const [multiLinksText, setMultiLinksText] = useState("");
   const [isBatchQueuing, setIsBatchQueuing] = useState(false);
+  const [importedUrls, setImportedUrls] = useState<string[]>([]);
+  const [importFileName, setImportFileName] = useState<string | null>(null);
+  const [importQuality, setImportQuality] = useState<"auto" | "video" | "audio">("auto");
 
   // Resolve the real Downloads directory on first launch
   useEffect(() => {
+    const applyPath = (p: string) => {
+      setDownloadPath(p);
+      setRealPath(p);
+    };
+
     const savedPath = localStorage.getItem("settings-default-path");
     if (savedPath) {
-      setDownloadPath(savedPath);
-      setRealPath(savedPath);
+      applyPath(savedPath);
     } else {
       invoke<string>("get_download_dir")
         .then((dir) => {
-          setDownloadPath(dir);
-          setRealPath(dir);
+          applyPath(dir);
           localStorage.setItem("settings-default-path", dir);
         })
         .catch((e) => {
           console.error("Failed to get download dir:", e);
-          // Fallback to home directory style path
           setRealPath(".");
         });
     }
+
+    // Keep in sync when user changes default path in Settings
+    const onPathChanged = (e: Event) => {
+      const updated = (e as CustomEvent<string>).detail;
+      if (updated) applyPath(updated);
+    };
+    window.addEventListener("settings-path-changed", onPathChanged);
+    return () => window.removeEventListener("settings-path-changed", onPathChanged);
   }, []);
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
@@ -224,7 +240,7 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
 
     selectedEntries.forEach((entry) => {
       useQueueStore.getState().addItem({
-        url: `https://www.youtube.com/watch?v=${entry.id}`, // Reconstruct URL
+        url: entry.url ?? `https://www.youtube.com/watch?v=${entry.id}`,
         title: entry.title,
         thumbnail: entry.thumbnail,
         duration: entry.duration,
@@ -239,22 +255,17 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
     });
 
     useQueueStore.getState().setProcessing(true);
-    toast(`Added ${selectedEntries.length} items to Queue!`, "success");
+    toast(t("dashboard.added_to_queue_batch", { count: selectedEntries.length }), "success");
     setShowPlaylistModal(false);
     setMetadata(null);
     setUrl("");
   };
 
-  const handleMultiLinkQueue = async () => {
-    const urls = multiLinksText
-      .split("\n")
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0);
-
+  const queueUrls = async (urls: string[], autoMaxQuality = false, forceAudio = false) => {
     if (urls.length === 0) return;
 
     setIsBatchQueuing(true);
-    const isAudio = activeTab === "audio";
+    const isAudio = !autoMaxQuality && (forceAudio || activeTab === "audio");
 
     for (const u of urls) {
       try {
@@ -262,26 +273,30 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
           url: u,
         });
 
-        let formatId = null;
-        let resLabel = isAudio ? "Audio" : "Auto";
+        // autoMaxQuality: skip format picking, let yt-dlp choose bestvideo+bestaudio
+        let formatId: string | null = null;
+        let resLabel = "Auto";
 
-        if (!isAudio) {
-          const bestVideo = data.formats
-            .slice()
-            .reverse()
-            .find((f) => f.resolution !== "Audio Only");
-          if (bestVideo) {
-            formatId = bestVideo.format_id;
-            resLabel = bestVideo.resolution;
-          } else if (data.formats.length > 0) {
-            formatId = data.formats[data.formats.length - 1].format_id;
+        if (!autoMaxQuality) {
+          resLabel = isAudio ? "Audio" : "Auto";
+          if (!isAudio) {
+            const bestVideo = data.formats
+              .slice()
+              .reverse()
+              .find((f) => f.resolution !== "Audio Only");
+            if (bestVideo) {
+              formatId = bestVideo.format_id;
+              resLabel = bestVideo.resolution;
+            } else if (data.formats.length > 0) {
+              formatId = data.formats[data.formats.length - 1].format_id;
+            }
+          } else {
+            const bestAudio = data.formats
+              .filter((f) => f.resolution === "Audio Only")
+              .slice()
+              .reverse()[0];
+            if (bestAudio) formatId = bestAudio.format_id;
           }
-        } else {
-          const bestAudio = data.formats
-            .filter((f) => f.resolution === "Audio Only")
-            .slice()
-            .reverse()[0];
-          if (bestAudio) formatId = bestAudio.format_id;
         }
 
         useQueueStore.getState().addItem({
@@ -290,7 +305,7 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
           thumbnail: data.thumbnail,
           duration: data.duration,
           uploader: data.uploader,
-          formatId: formatId,
+          formatId,
           isAudio,
           resolution: resLabel,
           path: realPath,
@@ -302,13 +317,13 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
         console.error("Failed to fetch metadata for", u, err);
         useQueueStore.getState().addItem({
           url: u,
-          title: "Error fetching: " + u,
+          title: t("dashboard.error_fetching") + u,
           thumbnail: "",
           duration: "",
           uploader: "",
           formatId: null,
           isAudio,
-          resolution: isAudio ? "Audio" : "Auto",
+          resolution: autoMaxQuality ? "Auto" : isAudio ? "Audio" : "Auto",
           path: realPath,
           subtitles,
           cookiesBrowser:
@@ -319,8 +334,59 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
 
     setIsBatchQueuing(false);
     useQueueStore.getState().setProcessing(true);
-    toast(t("dashboard.add_to_queue") + ` (${urls.length} items)!`, "success");
+    toast(t("dashboard.added_to_queue_batch", { count: urls.length }), "success");
+  };
+
+  const handleMultiLinkQueue = async () => {
+    const urls = multiLinksText
+      .split("\n")
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+    await queueUrls(urls);
     setMultiLinksText("");
+  };
+
+  const handleImportFile = async () => {
+    const selected = await open({
+      multiple: false,
+      filters: [{ name: "URL Lists", extensions: ["txt", "csv", "xlsx"] }],
+    });
+    if (!selected) return;
+
+    const filePath = selected as string;
+    const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
+    let urls: string[] = [];
+
+    if (ext === "xlsx") {
+      const bytes = await readFile(filePath);
+      const workbook = XLSX.read(bytes, { type: "array" });
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json<string[]>(sheet, { header: 1 });
+        for (const row of rows) {
+          const cell = row[0];
+          if (typeof cell === "string" && cell.startsWith("http")) {
+            urls.push(cell.trim());
+          }
+        }
+      }
+    } else {
+      const text = await readTextFile(filePath);
+      urls = text
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l.startsWith("http"));
+    }
+
+    setImportedUrls(urls);
+    setImportFileName(filePath.split(/[\\/]/).pop() ?? filePath);
+  };
+
+  const handleImportQueue = async () => {
+    if (importedUrls.length === 0) return;
+    await queueUrls(importedUrls, importQuality === "auto", importQuality === "audio");
+    setImportedUrls([]);
+    setImportFileName(null);
   };
 
   const videoFormats =
@@ -360,36 +426,34 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
 
         <div className="bg-zinc-900/50 border border-white/10 rounded-2xl p-2 shadow-2xl shadow-black/50 backdrop-blur-xl mb-12 transform hover:scale-[1.01] transition-transform duration-300">
           <div className="flex items-center gap-4 mb-3 px-2 pt-2">
-            <button
-              onClick={() => setIsMultiLink(false)}
-              className={clsx(
-                "text-sm font-bold pb-1 transition-colors",
-                !isMultiLink
-                  ? "text-white border-b-2 border-purple-500"
-                  : "text-zinc-500 hover:text-white",
-              )}
-            >
-              Single Link
-            </button>
-            <button
-              onClick={() => setIsMultiLink(true)}
-              className={clsx(
-                "text-sm font-bold pb-1 transition-colors",
-                isMultiLink
-                  ? "text-white border-b-2 border-purple-500"
-                  : "text-zinc-500 hover:text-white",
-              )}
-            >
-              Multiple Links
-            </button>
+            {(["single", "multi", "import"] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setInputMode(mode)}
+                className={clsx(
+                  "text-sm font-bold pb-1 transition-colors",
+                  inputMode === mode
+                    ? "text-white border-b-2 border-purple-500"
+                    : "text-zinc-500 hover:text-white",
+                )}
+              >
+                {mode === "single"
+                  ? t("dashboard.single_link_tab")
+                  : mode === "multi"
+                    ? t("dashboard.multi_link_tab")
+                    : t("dashboard.import_file_tab")}
+              </button>
+            ))}
           </div>
 
           <div className="flex flex-col md:flex-row gap-2">
             <div className="flex-1 relative">
-              <div className="absolute left-4 top-4 text-zinc-500">
-                <Link className="w-5 h-5" />
-              </div>
-              {!isMultiLink ? (
+              {inputMode !== "import" && (
+                <div className="absolute left-4 top-4 text-zinc-500">
+                  <Link className="w-5 h-5" />
+                </div>
+              )}
+              {inputMode === "single" ? (
                 <input
                   type="text"
                   placeholder={t("dashboard.input_placeholder")}
@@ -398,17 +462,48 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
                   onChange={(e) => setUrl(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleAnalyze()}
                 />
-              ) : (
+              ) : inputMode === "multi" ? (
                 <textarea
-                  placeholder="Paste multiple links here, one per line..."
+                  placeholder={t("dashboard.multi_link_placeholder")}
                   className="w-full h-32 bg-transparent border-none pl-12 pr-4 pt-4 text-white placeholder:text-zinc-600 focus:outline-none text-base font-medium resize-none"
                   value={multiLinksText}
                   onChange={(e) => setMultiLinksText(e.target.value)}
                 />
+              ) : (
+                <div className="w-full min-h-[56px] p-4 flex flex-col gap-3">
+                  <button
+                    onClick={handleImportFile}
+                    className="flex items-center gap-3 text-zinc-400 hover:text-white transition-colors"
+                  >
+                    <FileUp className="w-5 h-5 text-purple-400" />
+                    <span className="text-sm font-medium">
+                      {importFileName
+                        ? importFileName
+                        : t("import_file.select_file")}
+                    </span>
+                    {importFileName && (
+                      <span className="text-xs text-purple-400 ml-auto">
+                        {t("import_file.change_file")}
+                      </span>
+                    )}
+                  </button>
+                  {importFileName && (
+                    <p className="text-xs text-zinc-500">
+                      {importedUrls.length > 0
+                        ? t("import_file.urls_found", { count: importedUrls.length })
+                        : t("import_file.no_urls")}
+                    </p>
+                  )}
+                  {!importFileName && (
+                    <p className="text-xs text-zinc-600">
+                      {t("import_file.select_file_hint")}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 
-            {!isMultiLink ? (
+            {inputMode === "single" ? (
               <button
                 onClick={handleAnalyze}
                 disabled={isAnalyzing || !url}
@@ -431,7 +526,7 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
                   </>
                 )}
               </button>
-            ) : (
+            ) : inputMode === "multi" ? (
               <div className="flex flex-col gap-2 min-w-[160px]">
                 <div className="flex gap-2">
                   <button
@@ -443,7 +538,7 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
                         : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white",
                     )}
                   >
-                    Video
+                    {t("dashboard.video_tab")}
                   </button>
                   <button
                     onClick={() => setActiveTab("audio")}
@@ -454,7 +549,7 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
                         : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white",
                     )}
                   >
-                    Audio
+                    {t("dashboard.audio_tab")}
                   </button>
                 </div>
                 <button
@@ -474,8 +569,52 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
                   )}
                   <span>
                     {isBatchQueuing
-                      ? "Fetching..."
-                      : `Add ${multiLinksText.split("\n").filter((l) => l.trim().length > 0).length} to Queue`}
+                      ? t("dashboard.fetching")
+                      : t("dashboard.add_n_to_queue", { count: multiLinksText.split("\n").filter((l) => l.trim().length > 0).length })}
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 min-w-[160px]">
+                <div className="flex gap-1">
+                  {(["video", "audio", "auto"] as const).map((mode) => (
+                    <button
+                      key={mode}
+                      onClick={() => setImportQuality(mode)}
+                      className={clsx(
+                        "flex-1 h-10 rounded-lg font-bold text-xs transition-colors border",
+                        importQuality === mode
+                          ? "bg-purple-600 border-purple-500 text-white"
+                          : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white",
+                      )}
+                    >
+                      {mode === "video"
+                        ? t("dashboard.video_tab")
+                        : mode === "audio"
+                          ? t("dashboard.audio_tab")
+                          : t("import_file.auto")}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={handleImportQueue}
+                  disabled={importedUrls.length === 0 || isBatchQueuing}
+                  className={clsx(
+                    "flex-1 px-4 rounded-xl font-bold text-white transition-all duration-300 flex items-center justify-center gap-2",
+                    importedUrls.length === 0 || isBatchQueuing
+                      ? "bg-zinc-800 cursor-not-allowed"
+                      : "bg-gradient-to-r from-purple-600 to-blue-600 hover:shadow-lg hover:shadow-purple-500/25 active:scale-95",
+                  )}
+                >
+                  {isBatchQueuing ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <ListPlus className="w-5 h-5" />
+                  )}
+                  <span>
+                    {isBatchQueuing
+                      ? t("dashboard.fetching")
+                      : t("import_file.add_to_queue", { count: importedUrls.length })}
                   </span>
                 </button>
               </div>
@@ -785,17 +924,10 @@ export function Dashboard({ onStartDownload }: DashboardProps) {
 
                       <button
                         onClick={handleDownload}
-                        disabled={isDownloading}
-                        className="h-10 px-6 bg-white text-black font-bold rounded-lg hover:bg-zinc-200 transition-colors flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="h-10 px-6 bg-white text-black font-bold rounded-lg hover:bg-zinc-200 transition-colors flex items-center gap-2 active:scale-95"
                       >
-                        {isDownloading ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Download className="w-4 h-4" />
-                        )}
-                        {isDownloading
-                          ? t("dashboard.downloading")
-                          : t("dashboard.download_now")}
+                        <Download className="w-4 h-4" />
+                        {t("dashboard.download_now")}
                       </button>
                     </div>
                   </div>

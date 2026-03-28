@@ -10,19 +10,6 @@ import { History } from "./views/History";
 import { Titlebar } from "./components/Titlebar";
 import { listen } from "@tauri-apps/api/event";
 
-export interface DownloadItem {
-  id: number;
-  title: string;
-  thumbnail: string;
-  status: "waiting" | "downloading" | "completed" | "error";
-  progress: number; // 0-100
-  size: string;
-  speed: string;
-  eta: string;
-  format: string;
-  quality: string;
-}
-
 function App() {
   const [currentView, setCurrentView] = useState("dashboard");
   const queueCount = useQueueStore(

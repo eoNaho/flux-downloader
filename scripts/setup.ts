@@ -76,12 +76,69 @@ async function setupWindows() {
   }
 }
 
+async function setupLinux() {
+  const target = "x86_64-unknown-linux-gnu";
+
+  // yt-dlp
+  const ytdlpPath = path.join(BINARY_DIR, `yt-dlp-${target}`);
+  if (!fs.existsSync(ytdlpPath)) {
+    await downloadFile(
+      "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp",
+      ytdlpPath,
+    );
+    fs.chmodSync(ytdlpPath, 0o755);
+  } else {
+    console.log("yt-dlp already exists.");
+  }
+
+  // ffmpeg
+  const ffmpegPath = path.join(BINARY_DIR, `ffmpeg-${target}`);
+  if (!fs.existsSync(ffmpegPath)) {
+    const tarPath = path.join(BINARY_DIR, "ffmpeg.tar.xz");
+    await downloadFile(
+      "https://github.com/yt-dlp/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz",
+      tarPath,
+    );
+    console.log("Extracting ffmpeg...");
+    execSync(`tar -xf "${tarPath}" -C "${BINARY_DIR}"`, { stdio: "inherit" });
+
+    const extractedFolder = path.join(
+      BINARY_DIR,
+      "ffmpeg-master-latest-linux64-gpl",
+    );
+    const extractedFfmpeg = path.join(extractedFolder, "bin", "ffmpeg");
+
+    if (fs.existsSync(extractedFfmpeg)) {
+      fs.renameSync(extractedFfmpeg, ffmpegPath);
+      fs.chmodSync(ffmpegPath, 0o755);
+      console.log("ffmpeg setup complete.");
+    } else {
+      console.error("Failed to find extracted ffmpeg binary");
+    }
+
+    // Cleanup
+    try {
+      fs.rmSync(extractedFolder, { recursive: true, force: true });
+      fs.unlinkSync(tarPath);
+    } catch (err) {
+      console.warn(
+        "Could not clean up extracted archive fully, you can ignore this.",
+        err,
+      );
+    }
+  } else {
+    console.log("ffmpeg already exists.");
+  }
+}
+
 async function main() {
   const platform = process.platform;
 
   console.log("--- FluxDownloader Environment Setup ---");
   if (platform === "win32") {
     await setupWindows();
+  } else if (platform === "linux") {
+    await setupLinux();
   } else {
     console.log(`Setup for platform ${platform} is not fully implemented yet.`);
     console.log(

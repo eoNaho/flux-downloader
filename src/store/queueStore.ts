@@ -44,7 +44,7 @@ export const useQueueStore = create<QueueState>((set) => ({
         ...state.items,
         {
           ...item,
-          id: Math.random().toString(36).substring(7), // Simple ID
+          id: crypto.randomUUID(),
           status: "queued",
           progress: 0,
           speed: "0 GiB/s",

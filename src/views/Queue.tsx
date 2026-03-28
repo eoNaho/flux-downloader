@@ -47,8 +47,8 @@ export function Queue() {
       }
       if (permitted) {
         sendNotification({
-          title: "Download Concluído ✅",
-          body: `${item.title}\nSalvo com sucesso!`,
+          title: t("queue.notification_title"),
+          body: `${item.title}\n${t("queue.notification_body")}`,
           sound: "default",
         });
       }
@@ -70,7 +70,7 @@ export function Queue() {
 
       try {
         const unlisten = await listen<string>(
-          "download-progress",
+          `download-progress:${item.id}`,
           (event: Event<string>) => {
             const line = event.payload.trim();
             const percentageMatch = line.match(/(\d+(?:\.\d+)?)\s*%/);
@@ -165,7 +165,6 @@ export function Queue() {
       <div className="max-w-5xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold text-white">{t("queue.title")}</h2>
-          {true && (
             <div className="flex gap-2">
               <button
                 onClick={processQueue}
@@ -197,7 +196,6 @@ export function Queue() {
                 {t("queue.clear_completed")}
               </button>
             </div>
-          )}
         </div>
 
         <div className="space-y-3">
@@ -325,7 +323,7 @@ function DownloadItemCard({
         {!isCompleted && !isError ? (
           <button
             className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-            title="Cancelar Download"
+            title={t("queue.cancel_download")}
             onClick={onRemove}
           >
             <X className="w-5 h-5" />
@@ -333,7 +331,7 @@ function DownloadItemCard({
         ) : (
           <button
             className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
-            title="Remover"
+            title={t("queue.remove")}
             onClick={onRemove}
           >
             <Trash2 className="w-5 h-5" />

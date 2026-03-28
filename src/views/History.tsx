@@ -90,6 +90,7 @@ function MiniPlayer({
   item: DownloadItem;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const blobSrc = useBlobSrc(item.exactPath);
 
   return (
@@ -111,7 +112,7 @@ function MiniPlayer({
           // Loading state
           <div className="flex flex-col items-center gap-2 text-zinc-500">
             <div className="w-6 h-6 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-            <span className="text-xs">Carregando...</span>
+            <span className="text-xs">{t("history.loading")}</span>
           </div>
         ) : item.isAudio ? (
           <>
@@ -312,9 +313,9 @@ export function History() {
         isOpen={isClearDialogOpen}
         onClose={() => setIsClearDialogOpen(false)}
         title={t("history.clear_all")}
-        description="Tem certeza que deseja limpar todo o histórico? Essa ação não apaga os arquivos baixados, apenas limpa a lista."
-        confirmText="Limpar Histórico"
-        cancelText="Cancelar"
+        description={t("history.clear_dialog_description")}
+        confirmText={t("history.clear_dialog_confirm")}
+        cancelText={t("history.clear_dialog_cancel")}
         onConfirm={clearHistory}
         danger={true}
       />

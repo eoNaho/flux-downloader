@@ -20,7 +20,15 @@
     "end_time_placeholder": "Fim (ex: 01:30)",
     "playlist_modal_title": "Selecionar Vídeos da Playlist",
     "playlist_select_all": "Selecionar Todos",
-    "playlist_add_selected": "Adicionar Selecionados"
+    "playlist_add_selected": "Adicionar Selecionados",
+    "single_link_tab": "Link Único",
+    "multi_link_tab": "Múltiplos Links",
+    "import_file_tab": "Importar Arquivo",
+    "multi_link_placeholder": "Cole múltiplos links aqui, um por linha...",
+    "fetching": "Buscando...",
+    "add_n_to_queue": "Adicionar {{count}} à Fila",
+    "error_fetching": "Erro ao buscar: ",
+    "added_to_queue_batch": "{{count}} itens adicionados à fila!"
   },
   "sidebar": {
     "dashboard": "Painel",
@@ -40,14 +48,22 @@
     "item_completed": "Concluído",
     "error": "Erro no download",
     "completed": "Concluído",
-    "open_folder": "Abrir Pasta"
+    "open_folder": "Abrir Pasta",
+    "cancel_download": "Cancelar Download",
+    "remove": "Remover",
+    "notification_title": "Download Concluído ✅",
+    "notification_body": "Salvo com sucesso!"
   },
   "history": {
     "title": "Histórico",
     "subtitle": "Gerencie seus downloads concluídos.",
     "empty": "Nenhum histórico encontrado.",
     "search_placeholder": "Pesquisar...",
-    "clear_all": "Limpar Histórico"
+    "clear_all": "Limpar Histórico",
+    "clear_dialog_description": "Tem certeza que deseja limpar todo o histórico? Essa ação não apaga os arquivos baixados, apenas limpa a lista.",
+    "clear_dialog_confirm": "Limpar Histórico",
+    "clear_dialog_cancel": "Cancelar",
+    "loading": "Carregando..."
   },
   "settings": {
     "title": "Configurações",
@@ -104,5 +120,14 @@
     "videos": "Vídeos",
     "audios": "Áudios",
     "top_format": "Formato Mais Usado"
+  },
+  "import_file": {
+    "select_file": "Selecionar Arquivo",
+    "select_file_hint": "Selecione um arquivo .txt, .csv ou .xlsx com um URL por linha/célula",
+    "change_file": "Trocar Arquivo",
+    "urls_found": "{{count}} URLs encontradas",
+    "no_urls": "Nenhum URL válido encontrado no arquivo",
+    "add_to_queue": "Adicionar {{count}} à Fila",
+    "auto": "Auto"
   }
 }

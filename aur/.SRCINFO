@@ -1,6 +1,6 @@
 pkgbase = flux-downloader-bin
 	pkgdesc = A modern, fast YouTube downloader built with Tauri
-	pkgver = 0.1.0
+	pkgver = 0.1.2
 	pkgrel = 1
 	url = https://github.com/eoNaho/flux-downloader
 	arch = x86_64
@@ -9,9 +9,11 @@ pkgbase = flux-downloader-bin
 	depends = gtk3
 	depends = libsoup3
 	depends = libappindicator-gtk3
+	depends = ffmpeg
+	depends = yt-dlp
 	provides = flux-downloader
 	conflicts = flux-downloader
-	source = https://github.com/eoNaho/flux-downloader/releases/download/v0.1.0/fluxdownloader_0.1.0_amd64.deb
+	source = https://github.com/eoNaho/flux-downloader/releases/download/v0.1.2/fluxdownloader_0.1.2_amd64.deb
 	sha256sums = SKIP
 
 pkgname = flux-downloader-bin

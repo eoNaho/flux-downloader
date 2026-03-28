@@ -50,6 +50,7 @@ export function Settings() {
       const path = selected as string;
       setDefaultPath(path);
       localStorage.setItem("settings-default-path", path);
+      window.dispatchEvent(new CustomEvent("settings-path-changed", { detail: path }));
     }
   };
 
