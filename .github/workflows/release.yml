@@ -170,65 +170,44 @@ jobs:
       - name: update PKGBUILD
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          DEB_URL="https://github.com/eoNaho/flux-downloader/releases/download/${GITHUB_REF_NAME}/flux-downloader_${VERSION}_amd64.deb"
+          DEB_URL="https://github.com/eoNaho/flux-downloader/releases/download/${GITHUB_REF_NAME}/fluxdownloader_${VERSION}_amd64.deb"
 
-          # Fetch the .deb checksum
+          # Fetch the .deb and compute sha256
           curl -sL "$DEB_URL" -o /tmp/flux.deb
           SHA256=$(sha256sum /tmp/flux.deb | cut -d' ' -f1)
 
-          cat > /tmp/aur-pkg/PKGBUILD << 'PKGEOF'
-          # Maintainer: Naho <naho@users.noreply.github.com>
-          pkgname=flux-downloader-bin
-          pkgver=VERSION_PLACEHOLDER
-          pkgrel=1
-          pkgdesc="A modern, fast YouTube downloader built with Tauri"
-          arch=('x86_64')
-          url="https://github.com/eoNaho/flux-downloader"
-          license=('MIT')
-          depends=('webkit2gtk-4.1' 'gtk3' 'libsoup3' 'libappindicator-gtk3')
-          provides=('flux-downloader')
-          conflicts=('flux-downloader')
-          source=("https://github.com/eoNaho/flux-downloader/releases/download/v${pkgver}/flux-downloader_${pkgver}_amd64.deb")
-          sha256sums=('SHA256_PLACEHOLDER')
-
-          package() {
-            bsdtar -xf "${srcdir}/data.tar"* -C "${pkgdir}/"
-          }
-          PKGEOF
-
-          # Remove leading whitespace from heredoc (YAML indentation artifact)
-          sed -i 's/^          //' /tmp/aur-pkg/PKGBUILD
-          # Replace placeholders
-          sed -i "s/VERSION_PLACEHOLDER/${VERSION}/g" /tmp/aur-pkg/PKGBUILD
-          sed -i "s/SHA256_PLACEHOLDER/${SHA256}/g" /tmp/aur-pkg/PKGBUILD
+          # Use the PKGBUILD from the repo as the source of truth,
+          # then update pkgver and sha256sums in-place
+          cp aur/PKGBUILD /tmp/aur-pkg/PKGBUILD
+          sed -i "s/^pkgver=.*/pkgver=${VERSION}/" /tmp/aur-pkg/PKGBUILD
+          sed -i "s/^sha256sums=.*/sha256sums=('${SHA256}')/" /tmp/aur-pkg/PKGBUILD
 
       - name: generate .SRCINFO and push
         run: |
           cd /tmp/aur-pkg
           VERSION="${{ steps.version.outputs.version }}"
-          SHA256=$(grep sha256sums PKGBUILD | cut -d"'" -f2)
-          cat > .SRCINFO << SRCEOF
-          pkgbase = flux-downloader-bin
-          	pkgdesc = A modern, fast YouTube downloader built with Tauri
-          	pkgver = ${VERSION}
-          	pkgrel = 1
-          	url = https://github.com/eoNaho/flux-downloader
-          	arch = x86_64
-          	license = MIT
-          	depends = webkit2gtk-4.1
-          	depends = gtk3
-          	depends = libsoup3
-          	depends = libappindicator-gtk3
-          	provides = flux-downloader
-          	conflicts = flux-downloader
-          	source = https://github.com/eoNaho/flux-downloader/releases/download/v${VERSION}/flux-downloader_${VERSION}_amd64.deb
-          	sha256sums = ${SHA256}
-
-          pkgname = flux-downloader-bin
-          SRCEOF
-          # Remove leading whitespace from heredoc
-          sed -i 's/^          //' .SRCINFO
-
+          SHA256=$(grep "sha256sums=" PKGBUILD | sed "s/sha256sums=('//;s/')//" )
+          printf '%s\n' \
+            "pkgbase = flux-downloader-bin" \
+            "	pkgdesc = "A modern, fast YouTube downloader built with Tauri" \
+            "	pkgver = ${VERSION}" \
+            "	pkgrel = 1" \
+            "	url = https://github.com/eoNaho/flux-downloader" \
+            "	arch = x86_64" \
+            "	license = MIT" \
+            "	depends = webkit2gtk-4.1" \
+            "	depends = gtk3" \
+            "	depends = libsoup3" \
+            "	depends = libappindicator-gtk3" \
+            "	depends = ffmpeg" \
+            "	depends = yt-dlp" \
+            "	provides = flux-downloader" \
+            "	conflicts = flux-downloader" \
+            "	source = https://github.com/eoNaho/flux-downloader/releases/download/v${VERSION}/fluxdownloader_${VERSION}_amd64.deb" \
+            "	sha256sums = ${SHA256}" \
+            "" \
+            "pkgname = flux-downloader-bin" \
+            > .SRCINFO
           git add -A
           git commit -m "Update to v${VERSION}" || echo "No changes to commit"
           git push --set-upstream origin master

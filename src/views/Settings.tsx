@@ -192,7 +192,7 @@ export function Settings() {
               <h3 className="font-medium text-zinc-200">
                 {t("settings.app_version")}
               </h3>
-              <p className="text-sm text-zinc-500">v0.1.2-alpha</p>
+              <p className="text-sm text-zinc-500">v0.1.3</p>
             </div>
             <div className="flex gap-2">
               {pendingUpdate && (
